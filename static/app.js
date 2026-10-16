@@ -1,318 +1,59 @@
-
 "use strict";
-
 const $=id=>document.getElementById(id);
-const state={authenticated:false,csrf:"",profile:null,portals:[],opportunities:[],filter:"all",currentAnalysis:null,searching:false};
-const PROFILE_KEY="impacto-fund-privado-profile-v2";
-
-function message(id,text="",type=""){
-  const el=$(id);if(!el)return;
-  el.textContent=text;el.className="message"+(type?" "+type:"");
-}
-function safeExternalUrl(value){
-  try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password?u.href:""}catch{return ""}
-}
-function makeId(){
-  return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
-}
-async function api(path,options={}){
-  const headers={...(options.headers||{})};
-  if(options.body&&!(options.body instanceof FormData))headers["Content-Type"]="application/json";
-  const response=await fetch(path,{credentials:"same-origin",...options,headers});
-  const ct=response.headers.get("content-type")||"";
-  const result=ct.includes("application/json")?await response.json():await response.text();
-  if(!response.ok){
-    const detail=typeof result==="object"&&result?result.detail||"No se pudo completar la solicitud.":"No se pudo completar la solicitud.";
-    throw new Error(detail);
-  }
-  return result;
-}
-function setAuthenticated(value){
-  state.authenticated=value;
-  $("loginPanel").classList.toggle("hidden",value);
-  $("appPanel").classList.toggle("hidden",!value);
-  $("logoutBtn").classList.toggle("hidden",!value);
-}
-async function checkSession(){
-  try{
-    const result=await api("/api/me");
-    state.csrf=result.csrf||"";
-    setAuthenticated(true);
-    loadProfile();
-    await loadPortals();
-  }catch{setAuthenticated(false)}
-}
-$("loginForm").addEventListener("submit",async e=>{
-  e.preventDefault();message("loginMessage","Verificando acceso...");
-  try{
-    const result=await api("/api/login",{method:"POST",body:JSON.stringify({username:$("username").value.trim(),password:$("password").value})});
-    state.csrf=result.csrf||"";$("password").value="";
-    setAuthenticated(true);message("loginMessage","");
-    loadProfile();await loadPortals();
-  }catch(error){message("loginMessage",error.message,"error")}
-});
-$("logoutBtn").addEventListener("click",async()=>{
-  try{await api("/api/logout",{method:"POST"})}catch{}
-  setAuthenticated(false);message("loginMessage","Has cerrado la sesión.");
-});
-function readProfileForm(){
-  return{
-    id:$("companyId").value||makeId(),
-    name:$("companyName").value.trim(),
-    location:$("companyLocation").value.trim(),
-    type:$("companyType").value,
-    description:$("companyDescription").value.trim(),
-    goals:$("companyGoals").value.trim(),
-    updatedAt:new Date().toISOString()
-  };
-}
-function profileIsValid(p){
-  return Boolean(p&&p.name&&p.description&&p.name.length<=160&&p.description.length<=6000);
-}
-function saveProfileLocal(profile){
-  try{localStorage.setItem(PROFILE_KEY,JSON.stringify(profile));return true}
-  catch{return false}
-}
-function loadProfile(){
-  try{
-    const saved=JSON.parse(localStorage.getItem(PROFILE_KEY)||"null");
-    if(saved&&profileIsValid(saved)){state.profile=saved;showProfileSummary();return}
-  }catch{}
-  state.profile=null;
-  $("profileForm").classList.remove("hidden");
-  $("savedProfileSummary").classList.add("hidden");
-  $("editProfileBtn").classList.add("hidden");
-}
-function fillProfileForm(p={}){
-  $("companyId").value=p.id||"";
-  $("companyName").value=p.name||"";
-  $("companyLocation").value=p.location||"";
-  $("companyType").value=p.type||"small_business";
-  $("companyDescription").value=p.description||"";
-  $("companyGoals").value=p.goals||"";
-}
-function showProfileSummary(){
-  const p=state.profile;if(!p)return;
-  $("profileForm").classList.add("hidden");
-  $("savedProfileSummary").classList.remove("hidden");
-  $("editProfileBtn").classList.remove("hidden");
-  const summary=$("savedProfileSummary");summary.replaceChildren();
-  const heading=document.createElement("strong");heading.textContent=p.name;
-  const description=document.createElement("p");description.textContent=p.description;
-  const details=document.createElement("p");
-  details.textContent=[p.location,p.type==="nonprofit"?"Organización sin fines de lucro":p.type==="startup"?"Empresa nueva":p.type==="individual"?"Persona / empleo":p.type==="small_business"?"Pequeña empresa":"Otro tipo de organización"].filter(Boolean).join(" · ");
-  summary.append(heading,description,details);
-}
-$("profileForm").addEventListener("submit",async e=>{
-  e.preventDefault();
-  const profile=readProfileForm();
-  if(!profile.name||!profile.description){
-    message("companyMessage","Escribe el nombre y describe la actividad de tu negocio.","error");return;
-  }
-  state.profile=profile;
-  if(!saveProfileLocal(profile)){
-    message("companyMessage","No se pudo guardar el perfil en este navegador. Comprueba el espacio disponible o la configuración de privacidad.","error");return;
-  }
-  showProfileSummary();
-  message("companyMessage","Perfil guardado. Puedes actualizarlo cuando quieras.","success");
-  await searchOpportunities();
-});
-$("editProfileBtn").addEventListener("click",()=>{
-  fillProfileForm(state.profile||{});
-  $("profileForm").classList.remove("hidden");
-  $("savedProfileSummary").classList.add("hidden");
-  $("editProfileBtn").classList.add("hidden");
-  $("companyName").focus();
-});
-function setSearching(value){
-  state.searching=value;
-  $("searchOpportunitiesBtn").disabled=value;
-  $("searchOpportunitiesBtn").textContent=value?"Buscando oportunidades...":"Encontrar oportunidades para mi negocio";
-  $("searchProgress").classList.toggle("hidden",!value);
-}
-$("profileForm").addEventListener("submit",e=>{
-  // La búsqueda se inicia tras guardar; el evento principal de guardado ya valida los datos.
-});
-async function searchOpportunities(){
-  if(!state.profile||!profileIsValid(state.profile)){
-    message("companyMessage","Completa primero los datos de tu negocio.","error");return;
-  }
-  if(state.searching)return;
-  setSearching(true);$("results").innerHTML="";
-  $("searchSummary").classList.add("hidden");
-  $("sourceStatus").replaceChildren();
-  message("searchMessage","Preparando búsquedas a partir de tu perfil...");
-  try{
-    const data=await api("/api/opportunities/search",{
-      method:"POST",
-      body:JSON.stringify({profile:state.profile,language:$("language").value,limit:10})
-    });
-    state.opportunities=Array.isArray(data.opportunities)?data.opportunities:[];
-    renderSearchSummary(data);
-    renderSourceStatus(data.sources||[]);
-    renderFilteredResults();
-    if(!state.opportunities.length){
-      message("searchMessage","No se encontraron resultados en las fuentes consultadas. Puedes cambiar la descripción del negocio o revisar las fuentes oficiales.","warning");
-    }else{
-      message("searchMessage",`${state.opportunities.length} resultado(s) encontrados. Revisa los requisitos y confirma la información en cada fuente oficial.`,"success");
-    }
-  }catch(error){
-    state.opportunities=[];
-    renderFilteredResults();
-    message("searchMessage",error.message,"error");
-  }finally{setSearching(false)}
-}
-function renderSearchSummary(data){
-  const box=$("searchSummary");box.replaceChildren();
-  const title=document.createElement("strong");
-  title.textContent=`Búsqueda para ${state.profile.name}`;
-  const info=document.createElement("p");
-  info.textContent=data.summary||"Se consultaron las fuentes disponibles con términos relacionados con tu negocio.";
-  box.append(title,info);box.classList.remove("hidden");
-}
-function renderSourceStatus(sources){
-  const container=$("sourceStatus");container.replaceChildren();
-  for(const source of sources){
-    const line=document.createElement("p");
-    const ok=source.status==="ok";
-    line.className=ok?"status-ok":"status-warning";
-    line.textContent=`${source.name||"Fuente"}: ${source.message|| (ok?"Consulta completada.":"Consulta no disponible.")}`;
-    container.appendChild(line);
-  }
-}
-function renderFilteredResults(){
-  const items=state.filter==="all"?state.opportunities:state.opportunities.filter(x=>x.category===state.filter);
-  renderOpportunityResults(items);
-}
-function renderOpportunityResults(items){
-  const container=$("results");container.replaceChildren();
-  if(!items.length){
-    const empty=document.createElement("div");empty.className="empty-state";
-    const heading=document.createElement("h3");heading.textContent=state.filter==="all"?"No hay resultados para mostrar":"No hay resultados en esta categoría";
-    const text=document.createElement("p");text.textContent="Prueba de nuevo más tarde, revisa tu perfil o consulta directamente los portales oficiales.";
-    empty.append(heading,text);container.appendChild(empty);return;
-  }
-  for(const item of items){
-    const card=document.createElement("article");card.className="result-card";
-    const title=document.createElement("h3");title.textContent=item.title||"Oportunidad sin título";
-    const match=document.createElement("p");match.className="match-label";
-    match.textContent=item.match_reason||"Revisa los detalles para comprobar si esta oportunidad encaja con tu negocio.";
-    const details=document.createElement("p");
-    details.textContent=[
-      item.agency?`Entidad: ${item.agency}`:"",
-      item.number?`Referencia: ${item.number}`:"",
-      item.status?`Estado publicado: ${item.status}`:"",
-      item.close_date?`Fecha límite indicada: ${item.close_date}`:""
-    ].filter(Boolean).join(" · ")||"Consulta la ficha oficial para ver los detalles.";
-    const meta=document.createElement("div");meta.className="result-meta";
-    const category=document.createElement("span");category.className="pill";
-    category.textContent=item.category==="grant"?"Subvención":item.category==="contract"?"Contrato":"Recurso";
-    meta.appendChild(category);
-    if(item.source){const src=document.createElement("span");src.className="pill";src.textContent=item.source;meta.appendChild(src)}
-    const actions=document.createElement("div");actions.className="result-actions";
-    const link=document.createElement("a");const url=safeExternalUrl(item.url);
-    if(url){link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Consultar fuente oficial"}
-    else{link.href="https://www.grants.gov/";link.target="_blank";link.rel="noopener noreferrer";link.textContent="Consultar portal oficial"}
-    const analyze=document.createElement("button");analyze.type="button";analyze.className="button button-secondary";analyze.textContent="Entender esta oportunidad";
-    analyze.addEventListener("click",()=>{
-      const text=[item.title,item.agency?`Entidad: ${item.agency}`:"",item.number?`Referencia: ${item.number}`:"",item.status?`Estado: ${item.status}`:"",item.close_date?`Fecha límite: ${item.close_date}`:"",item.url?`Enlace: ${item.url}`:"",item.description||""].filter(Boolean).join("\n");
-      $("analysisText").value=text;
-      $("analysisTask").value="eligibility";
-      $("analysisPanel").scrollIntoView({behavior:"smooth",block:"start"});
-    });
-    actions.append(link,analyze);card.append(title,match,details,meta,actions);
-    container.appendChild(card);
-  }
-}
-document.querySelectorAll("[data-filter]").forEach(button=>{
-  button.addEventListener("click",()=>{
-    state.filter=button.dataset.filter;
-    document.querySelectorAll("[data-filter]").forEach(tab=>{
-      const active=tab===button;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));
-    });
-    if(state.filter==="work"){renderPortalResults();return}
-    renderFilteredResults();
-  });
-});
-function renderPortalResults(){
-  const container=$("results");container.replaceChildren();
-  const portals=state.portals.filter(p=>["Empleo","Empleo federal","Apoyo empresarial"].includes(p.type));
-  if(!portals.length){
-    const empty=document.createElement("div");empty.className="empty-state";empty.textContent="Los portales de empleo y recursos no están disponibles en este momento.";container.appendChild(empty);return;
-  }
-  for(const portal of portals){
-    const card=document.createElement("article");card.className="result-card";
-    const title=document.createElement("h3");title.textContent=portal.name;
-    const description=document.createElement("p");description.textContent=portal.description||"Portal oficial de recursos.";
-    const link=document.createElement("a");link.href=safeExternalUrl(portal.url)||"https://www.usa.gov/";link.target="_blank";link.rel="noopener noreferrer";link.textContent="Abrir portal";
-    card.append(title,description,link);container.appendChild(card);
-  }
-}
-async function loadPortals(){
-  try{
-    const data=await api("/api/portals");state.portals=data.portals||[];
-    renderPortalList($("portalLinks"),state.portals);
-  }catch(error){message("searchMessage",error.message,"error")}
-}
-function renderPortalList(container,portals){
-  container.replaceChildren();
-  for(const portal of portals){
-    const card=document.createElement("article");card.className="link-card";
-    const title=document.createElement("h3");title.textContent=portal.name||"Portal oficial";
-    const desc=document.createElement("p");desc.textContent=portal.description||"Consulta la fuente oficial.";
-    const link=document.createElement("a");link.href=safeExternalUrl(portal.url)||"https://www.usa.gov/";link.target="_blank";link.rel="noopener noreferrer";link.textContent="Abrir portal oficial";
-    card.append(title,desc,link);container.appendChild(card);
-  }
-}
-$("analyzeBtn").addEventListener("click",async()=>{
-  const text=$("analysisText").value.trim();
-  if(text.length<20){message("analysisMessage","Pega al menos 20 caracteres de la oportunidad.","error");return}
-  if(!$("aiConsent").checked){message("analysisMessage","Marca la autorización para enviar el texto al servicio de IA.","error");return}
-  const button=$("analyzeBtn");button.disabled=true;button.textContent="Analizando...";
-  $("analysisResult").classList.add("hidden");
-  message("analysisMessage","Analizando el texto autorizado...");
-  try{
-    const p=state.profile;
-    const business=p?[
-      `Nombre: ${p.name}`,
-      `Ubicación: ${p.location||"No indicada"}`,
-      `Tipo: ${p.type||"No indicado"}`,
-      `Actividad: ${p.description}`,
-      `Objetivos: ${p.goals||"No indicados"}`
-    ].join("\n"):"";
-    const result=await api("/api/ai/analyze",{
-      method:"POST",
-      body:JSON.stringify({text,business,task:$("analysisTask").value,language:$("language").value})
-    });
-    state.currentAnalysis=result.answer||"";
-    $("analysisProvider").textContent=`Servicio de análisis: ${result.provider||"IA"}`;
-    $("analysisOutput").textContent=state.currentAnalysis;
-    $("analysisResult").classList.remove("hidden");
-    message("analysisMessage","Análisis completado. Verifica las condiciones en la fuente oficial.","success");
-  }catch(error){message("analysisMessage",error.message,"error")}
-  finally{button.disabled=false;button.textContent="Explicar esta oportunidad";$("aiConsent").checked=false}
-});
-$("copyAnalysisBtn").addEventListener("click",async()=>{
-  if(!state.currentAnalysis)return;
-  try{
-    await navigator.clipboard.writeText(state.currentAnalysis);
-    message("analysisMessage","Explicación copiada.","success");
-  }catch{
-    const range=document.createRange();range.selectNodeContents($("analysisOutput"));
-    const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
-    message("analysisMessage","Selecciona el texto y cópialo manualmente.","warning");
-  }
-});
-const translations={
-  es:{logout:"Salir",search:"Encontrar oportunidades para mi negocio",searching:"Buscando oportunidades...",analyze:"Explicar esta oportunidad"},
-  en:{logout:"Log out",search:"Find opportunities for my business",searching:"Searching for opportunities...",analyze:"Explain this opportunity"},
-  pt:{logout:"Sair",search:"Encontrar oportunidades para minha empresa",searching:"Buscando oportunidades...",analyze:"Explicar esta oportunidade"}
-};
-$("language").addEventListener("change",()=>{
-  const lang=$("language").value;document.documentElement.lang=lang;
-  const labels=translations[lang]||translations.es;
-  $("logoutBtn").textContent=labels.logout;
-  $("searchOpportunitiesBtn").textContent=state.searching?labels.searching:labels.search;
-  $("analyzeBtn").textContent=labels.analyze;
-});
-checkSession();
+const KEYS={profile:"ifp-profile-v4",crm:"ifp-crm-v4",projects:"ifp-projects-v4",parts:"ifp-parts-v4",history:"ifp-history-v4",notes:"ifp-notes-v4"};
+const state={authenticated:false,profile:null,portals:[],opportunities:[],filter:"all",analysis:"",parts:[],pdfText:""};
+const read=(key,fallback=[])=>{try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))}catch{return fallback}};
+const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{alert("No hay espacio disponible en el navegador. Copia o exporta la información y borra datos antiguos.");return false}};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const id=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
+const lang=()=> $("language").value;
+const msg=(el,text,type="")=>{if($(el)){$(el).textContent=text;$(el).className="message "+type}};
+async function api(path,options={}){const headers={...(options.headers||{})};if(options.body)headers["Content-Type"]="application/json";const r=await fetch(path,{credentials:"same-origin",...options,headers});let d;try{d=await r.json()}catch{d={detail:"Respuesta no válida del servidor."}}if(!r.ok)throw Error(d.detail||"No se pudo completar la solicitud.");return d}
+function auth(on){state.authenticated=on;$("loginPanel").classList.toggle("hidden",on);$("appPanel").classList.toggle("hidden",!on);$("logoutBtn").classList.toggle("hidden",!on)}
+async function session(){try{await api("/api/me");auth(true);loadProfile();await loadPortals();renderCRM();renderProjects();renderParts();renderHistory()}catch{auth(false)}}
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();msg("loginMessage","Verificando acceso...");try{await api("/api/login",{method:"POST",body:JSON.stringify({username:$("username").value.trim(),password:$("password").value})});$("password").value="";msg("loginMessage","");auth(true);loadProfile();await loadPortals();renderCRM();renderProjects();renderParts();renderHistory()}catch(x){msg("loginMessage",x.message,"error")}});
+$("logoutBtn").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}auth(false);msg("loginMessage","Sesión cerrada.")});
+function profileForm(){return{id:$("companyId").value||id(),name:$("companyName").value.trim(),location:$("companyLocation").value.trim(),type:$("companyType").value,description:$("companyDescription").value.trim(),goals:$("companyGoals").value.trim(),updatedAt:new Date().toISOString()}}
+function validProfile(p){return p&&p.name&&p.description&&p.name.length<=160&&p.description.length<=6000}
+function loadProfile(){const p=read(KEYS.profile,null);if(validProfile(p)){state.profile=p;showProfile();fillProfile(p)}else editProfile()}
+function fillProfile(p={}){for(const [k,field] of Object.entries({id:"companyId",name:"companyName",location:"companyLocation",type:"companyType",description:"companyDescription",goals:"companyGoals"}))$(field).value=p[k]||""}
+function showProfile(){const p=state.profile;if(!p)return;$("profileForm").classList.add("hidden");$("savedProfileSummary").classList.remove("hidden");$("editProfileBtn").classList.remove("hidden");$("savedProfileSummary").innerHTML=`<strong>${esc(p.name)}</strong><p>${esc(p.description)}</p><p>${esc(p.location)} · ${esc(p.type)}</p><p>${esc(p.goals)}</p>`}
+function editProfile(){fillProfile(state.profile||{});$("profileForm").classList.remove("hidden");$("savedProfileSummary").classList.add("hidden");$("editProfileBtn").classList.add("hidden")}
+$("editProfileBtn").addEventListener("click",editProfile);
+$("profileForm").addEventListener("submit",async e=>{e.preventDefault();const p=profileForm();if(!validProfile(p)){msg("companyMessage","Escribe el nombre y la actividad del negocio.","error");return}if(!write(KEYS.profile,p))return;state.profile=p;showProfile();msg("companyMessage","Perfil guardado en este navegador.","success");await searchOpportunities()});
+function businessText(){const p=state.profile;return p?`Nombre: ${p.name}\nUbicación: ${p.location}\nTipo: ${p.type}\nActividad: ${p.description}\nObjetivos: ${p.goals}`:"Perfil no proporcionado."}
+function setBusy(on){$("searchProgress").classList.toggle("hidden",!on);$("searchOpportunitiesBtn").disabled=on}
+async function searchOpportunities(){if(!state.profile){msg("searchMessage","Completa primero el perfil del negocio.","warning");return}setBusy(true);msg("searchMessage","Consultando las fuentes disponibles...");try{const d=await api("/api/opportunities/search",{method:"POST",body:JSON.stringify({profile:state.profile,language:lang(),limit:10})});state.opportunities=d.opportunities||[];renderResults();$("searchSummary").classList.remove("hidden");$("searchSummary").innerHTML=`<strong>${state.opportunities.length} resultado(s)</strong><p>${esc(d.summary||"Búsqueda completada.")}</p><p>${esc(d.notice||"Comprueba los requisitos en la fuente oficial.")}</p>`;const c=d.classification||{};$("naicsResults").innerHTML=`<h3>Códigos NAICS candidatos</h3><p>Estos códigos no están certificados por esta aplicación. Verifica la descripción y el código en la fuente oficial.</p>${(c.naics_candidates||[]).length?(c.naics_candidates||[]).map(n=>`<span class="pill">${esc(n)}</span> `).join(""):"<p>No se obtuvo un código candidato fiable. No se inventó uno.</p>"}<p><a href="https://www.census.gov/naics/" target="_blank" rel="noopener noreferrer">Consultar NAICS en Census.gov</a></p><p>Términos de búsqueda: ${esc((c.keywords||[]).join(", "))}</p>`;renderSources(d.sources||[]);msg("searchMessage",state.opportunities.length?"Resultados cargados. Confirma fechas y requisitos en cada fuente.":"No se encontraron resultados en las consultas disponibles.","success")}catch(e){state.opportunities=[];renderResults();msg("searchMessage",e.message,"error")}finally{setBusy(false)}}
+function safeUrl(url){try{const u=new URL(url);return u.protocol==="https:"?u.href:""}catch{return""}}
+function renderResults(){const list=$("results");const items=state.opportunities.filter(x=>state.filter==="all"||x.category===state.filter||(state.filter==="work"&&x.category==="work"));if(!items.length){list.innerHTML='<div class="empty-state"><h3>Sin resultados en esta vista</h3><p>Prueba otra categoría o realiza una nueva búsqueda.</p></div>';return}list.innerHTML=items.map((x,i)=>{const url=safeUrl(x.url);return`<article class="result-card"><h3>${esc(x.title)}</h3><p>${esc(x.agency||x.source||"Fuente no indicada")}</p><p>${esc(x.description||x.match_reason||"Confirma los detalles en el portal oficial.")}</p><div class="result-meta"><span class="pill">${esc(x.category==="grant"?"Subvención":x.category==="contract"?"Contrato":"Recurso")}</span>${x.close_date?`<span class="pill">Cierre: ${esc(x.close_date)}</span>`:""}${x.number?`<span class="pill">${esc(x.number)}</span>`:""}</div><div class="result-actions">${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir fuente oficial</a>`:""}<button class="button button-secondary" data-op="${i}" type="button">Entender esta oportunidad</button><button class="button button-light" data-save="${i}" type="button">Guardar en CRM</button></div></article>`}).join("");list.querySelectorAll("[data-op]").forEach(b=>b.addEventListener("click",()=>{const x=items[Number(b.dataset.op)];$("analysisTask").value="eligibility";$("analysisText").value=`Título: ${x.title}\nEntidad: ${x.agency}\nNúmero: ${x.number}\nEstado: ${x.status}\nFecha límite: ${x.close_date}\nFuente: ${x.url}\nDescripción: ${x.description||x.match_reason||""}`;$("analysisPanel").scrollIntoView({behavior:"smooth"})}));list.querySelectorAll("[data-save]").forEach(b=>b.addEventListener("click",()=>saveCRM(items[Number(b.dataset.save)])))}
+function renderSources(sources){$("sourceStatus").innerHTML=sources.map(s=>`<p class="${s.status==="ok"?"status-ok":"status-warning"}"><strong>${esc(s.name)}:</strong> ${esc(s.message)}</p>`).join("")}
+document.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{state.filter=b.dataset.filter;document.querySelectorAll("[data-filter]").forEach(x=>{x.classList.toggle("active",x===b);x.setAttribute("aria-selected",x===b?"true":"false")});renderResults()}));
+async function loadPortals(){try{const d=await api("/api/portals");state.portals=d.portals||[];$("portalLinks").innerHTML=state.portals.map(p=>`<article class="link-card"><strong>${esc(p.name)}</strong><p>${esc(p.description)}</p><a href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">Abrir sitio</a></article>`).join("")}catch(e){$("portalLinks").textContent=e.message}}
+$("analyzeBtn").addEventListener("click",runAnalysis);
+async function runAnalysis(){const text=$("analysisText").value.trim();if(text.length<20){msg("analysisMessage","Escribe o incorpora al menos 20 caracteres de información.","warning");return}if(!$("aiConsent").checked){msg("analysisMessage","Autoriza expresamente el envío al proveedor de IA antes de continuar.","warning");return}const b=$("analyzeBtn");b.disabled=true;msg("analysisMessage","Analizando la información...");try{const d=await api("/api/ai/analyze",{method:"POST",body:JSON.stringify({text,business:businessText(),task:$("analysisTask").value,language:lang()})});state.analysis=d.answer||"";$("analysisOutput").textContent=state.analysis;$("analysisProvider").textContent=`Proveedor: ${d.provider||"No indicado"}. Revisa los datos y verifica las afirmaciones importantes.`;$("analysisResult").classList.remove("hidden");msg("analysisMessage","Análisis terminado. Revísalo antes de utilizarlo.","success");saveHistory($("analysisTask").value,text,state.analysis)}catch(e){msg("analysisMessage",e.message,"error")}finally{b.disabled=false}}
+$("copyAnalysisBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(state.analysis);msg("analysisMessage","Explicación copiada.","success")}catch{msg("analysisMessage","No se pudo copiar automáticamente. Selecciona el texto y cópialo.")}});
+$("askBtn").addEventListener("click",async()=>{const q=$("questionText").value.trim();if(q.length<2){msg("questionMessage","Escribe tu pregunta.","warning");return}if(!$("questionConsent").checked){msg("questionMessage","Autoriza el envío de la pregunta y del perfil al proveedor de IA.","warning");return}const b=$("askBtn");b.disabled=true;msg("questionMessage","Preparando una respuesta...");try{const d=await api("/api/ai/ask",{method:"POST",body:JSON.stringify({text:q,business:businessText(),task:"ask",language:lang()})});$("questionAnswer").textContent=d.answer||"";$("questionResult").classList.remove("hidden");msg("questionMessage",`Respuesta generada con ${d.provider||"IA"}. Verifica los datos críticos.`,"success");saveHistory("ask",q,d.answer)}catch(e){msg("questionMessage",e.message,"error")}finally{b.disabled=false}});
+$("makePitchBtn").addEventListener("click",()=>{$("analysisTask").value="pitch";$("analysisText").value=`Prepara un pitch empresarial y una propuesta breve con el siguiente perfil. Indica claramente los datos que faltan.\n${businessText()}`;$("analysisPanel").scrollIntoView({behavior:"smooth"})});
+$("makeProposalBtn").addEventListener("click",()=>{$("analysisTask").value="proposal";$("analysisText").value=`Prepara un borrador de propuesta basado en esta información. Marca los campos ausentes como [POR COMPLETAR].\n${businessText()}\n\nConvocatoria o requisitos:\n`;$("analysisPanel").scrollIntoView({behavior:"smooth"});$("analysisText").focus()});
+$("makeChecklistBtn").addEventListener("click",()=>{$("analysisTask").value="checklist";$("analysisPanel").scrollIntoView({behavior:"smooth"});$("analysisText").focus()});
+function saveHistory(task,input,answer){const h=read(KEYS.history,[]);h.unshift({id:id(),date:new Date().toISOString(),task,input:input.slice(0,5000),answer:answer.slice(0,12000)});write(KEYS.history,h.slice(0,100));renderHistory()}
+function renderHistory(){const h=read(KEYS.history,[]);$("historyList").innerHTML=h.length?h.slice(0,20).map(x=>`<article class="record-card"><strong>${esc(x.task)} · ${esc(new Date(x.date).toLocaleString())}</strong><p>${esc(x.input.slice(0,180))}</p><button class="button button-light" data-history="${esc(x.id)}">Ver respuesta</button></article>`).join(""):"<p>Aún no hay análisis guardados.</p>";$("historyList").querySelectorAll("[data-history]").forEach(b=>b.addEventListener("click",()=>{const x=h.find(z=>z.id===b.dataset.history);if(x){$("analysisOutput").textContent=x.answer;$("analysisProvider").textContent="Registro guardado localmente.";state.analysis=x.answer;$("analysisResult").classList.remove("hidden");$("analysisPanel").scrollIntoView({behavior:"smooth"})}}))}
+function saveCRM(item){const entries=read(KEYS.crm,[]);entries.unshift({id:id(),date:new Date().toISOString(),title:item.title||"Oportunidad",agency:item.agency||"",status:"Pendiente",notes:"",url:safeUrl(item.url),type:item.category||"opportunity"});write(KEYS.crm,entries);renderCRM();msg("crmMessage","Oportunidad guardada en tu CRM local.","success")}
+$("crmForm").addEventListener("submit",e=>{e.preventDefault();const title=$("crmTitle").value.trim();if(!title)return;const a=read(KEYS.crm,[]);a.unshift({id:id(),date:new Date().toISOString(),title,agency:$("crmAgency").value.trim(),status:$("crmStatus").value,notes:$("crmNotes").value.trim(),url:safeUrl($("crmUrl").value),type:"contact"});if(write(KEYS.crm,a)){$("crmForm").reset();renderCRM();msg("crmMessage","Registro guardado en este navegador.","success")}});
+function renderCRM(){const a=read(KEYS.crm,[]);$("crmList").innerHTML=a.length?a.map(x=>`<article class="record-card"><strong>${esc(x.title)}</strong><p>${esc(x.agency)} · ${esc(x.status)} · ${esc(new Date(x.date).toLocaleDateString())}</p>${x.notes?`<p>${esc(x.notes)}</p>`:""}${safeUrl(x.url)?`<p><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener noreferrer">Abrir enlace</a></p>`:""}<div class="button-row"><select data-status="${esc(x.id)}"><option ${x.status==="Pendiente"?"selected":""}>Pendiente</option><option ${x.status==="En curso"?"selected":""}>En curso</option><option ${x.status==="Enviado"?"selected":""}>Enviado</option><option ${x.status==="Ganado"?"selected":""}>Ganado</option><option ${x.status==="Descartado"?"selected":""}>Descartado</option></select><button class="button button-danger" data-delcrm="${esc(x.id)}">Borrar registro</button></div></article>`).join(""):"<p>Aún no hay registros. Guarda oportunidades o añade un contacto manualmente.</p>";$("crmList").querySelectorAll("[data-status]").forEach(s=>s.addEventListener("change",()=>{const b=read(KEYS.crm,[]);const x=b.find(z=>z.id===s.dataset.status);if(x){x.status=s.value;write(KEYS.crm,b);renderCRM()}}));$("crmList").querySelectorAll("[data-delcrm]").forEach(b=>b.addEventListener("click",()=>{if(confirm("¿Borrar este registro?")){write(KEYS.crm,read(KEYS.crm,[]).filter(x=>x.id!==b.dataset.delcrm));renderCRM()}}))}
+$("projectForm").addEventListener("submit",e=>{e.preventDefault();const title=$("projectTitle").value.trim();if(!title)return;const p=read(KEYS.projects,[]);p.unshift({id:id(),title,description:$("projectDescription").value.trim(),deadline:$("projectDeadline").value,priority:$("projectPriority").value,status:"Pendiente",createdAt:new Date().toISOString()});if(write(KEYS.projects,p)){$("projectForm").reset();renderProjects();msg("projectMessage","Proyecto guardado localmente.","success")}});
+function renderProjects(){const p=read(KEYS.projects,[]);const rank={Alta:0,Media:1,Baja:2};p.sort((a,b)=>rank[a.priority]-rank[b.priority]||(a.deadline||"9999").localeCompare(b.deadline||"9999"));$("projectList").innerHTML=p.length?p.map(x=>`<article class="record-card"><strong>${esc(x.title)}</strong><p>Prioridad: ${esc(x.priority)} · Estado: ${esc(x.status)} · Fecha límite: ${esc(x.deadline||"Por definir")}</p><p>${esc(x.description)}</p><div class="button-row"><select data-projectstatus="${esc(x.id)}"><option ${x.status==="Pendiente"?"selected":""}>Pendiente</option><option ${x.status==="En curso"?"selected":""}>En curso</option><option ${x.status==="Bloqueado"?"selected":""}>Bloqueado</option><option ${x.status==="Completado"?"selected":""}>Completado</option></select><button class="button button-danger" data-delproject="${esc(x.id)}">Borrar proyecto</button></div></article>`).join(""):"<p>Aún no hay proyectos registrados.</p>";$("projectList").querySelectorAll("[data-projectstatus]").forEach(s=>s.addEventListener("change",()=>{const a=read(KEYS.projects,[]),x=a.find(z=>z.id===s.dataset.projectstatus);if(x){x.status=s.value;write(KEYS.projects,a);renderProjects()}}));$("projectList").querySelectorAll("[data-delproject]").forEach(b=>b.addEventListener("click",()=>{if(confirm("¿Borrar este proyecto?")){write(KEYS.projects,read(KEYS.projects,[]).filter(x=>x.id!==b.dataset.delproject));renderProjects()}}))}
+$("addPartBtn").addEventListener("click",()=>{const content=$("partText").value.trim();if(!content){msg("partsMessage","Pega o escribe el contenido de esta parte.","warning");return}const parts=read(KEYS.parts,[]);if(parts.length>=10){msg("partsMessage","Ya tienes 10 partes. Elimina o edita una antes de añadir otra.","warning");return}parts.push({id:id(),title:$("partTitle").value.trim()||`Parte ${parts.length+1}`,content,updatedAt:new Date().toISOString()});if(write(KEYS.parts,parts)){$("partText").value="";$("partTitle").value="";renderParts();msg("partsMessage",`Parte guardada. Total: ${parts.length} de 10.`,"success")}});
+function renderParts(){state.parts=read(KEYS.parts,[]);$("partsList").innerHTML=state.parts.length?state.parts.map((p,i)=>`<article class="record-card"><strong>${i+1}. ${esc(p.title)}</strong><p>${p.content.length.toLocaleString()} caracteres</p><div class="button-row"><button class="button button-light" data-editpart="${esc(p.id)}">Editar</button><button class="button button-danger" data-delpart="${esc(p.id)}">Borrar parte</button></div></article>`).join(""):"<p>No hay partes temporales guardadas.</p>";$("partsList").querySelectorAll("[data-editpart]").forEach(b=>b.addEventListener("click",()=>{const p=state.parts.find(x=>x.id===b.dataset.editpart);if(p){$("partTitle").value=p.title;$("partText").value=p.content;$("addPartBtn").textContent="Guardar como nueva parte";msg("partsMessage","Edita el texto y pulsa “Guardar cambios de parte”.") ;$("updatePartBtn").dataset.editid=p.id;$("updatePartBtn").classList.remove("hidden")}}));$("partsList").querySelectorAll("[data-delpart]").forEach(b=>b.addEventListener("click",()=>{if(confirm("¿Borrar esta parte temporal?")){write(KEYS.parts,state.parts.filter(x=>x.id!==b.dataset.delpart));renderParts()}}));$("partsCount").textContent=`${state.parts.length} de 10 partes guardadas · ${state.parts.reduce((n,p)=>n+p.content.length,0).toLocaleString()} caracteres`;$("addPartBtn").disabled=state.parts.length>=10}
+$("updatePartBtn").addEventListener("click",()=>{const id=$("updatePartBtn").dataset.editid;const content=$("partText").value.trim();if(!content)return;const a=read(KEYS.parts,[]),p=a.find(x=>x.id===id);if(p){p.title=$("partTitle").value.trim()||p.title;p.content=content;p.updatedAt=new Date().toISOString();write(KEYS.parts,a);$("partText").value="";$("partTitle").value="";$("updatePartBtn").classList.add("hidden");$("addPartBtn").textContent="Añadir parte";delete $("updatePartBtn").dataset.editid;renderParts();msg("partsMessage","Parte actualizada.","success")}});
+$("combinePartsBtn").addEventListener("click",()=>{const parts=read(KEYS.parts,[]);if(!parts.length){msg("partsMessage","Añade al menos una parte antes de unirlas.","warning");return}const combined=parts.map((p,i)=>`===== ${p.title||"Parte "+(i+1)} =====\n${p.content}`).join("\n\n");if(combined.length>MAX_INPUT){msg("partsMessage",`El conjunto tiene ${combined.length.toLocaleString()} caracteres y supera el límite de ${MAX_INPUT.toLocaleString()}. Divide el análisis en grupos más pequeños; las partes seguirán guardadas.`,"warning");return}$("analysisText").value=combined;$("analysisPanel").scrollIntoView({behavior:"smooth"});msg("partsMessage",`${parts.length} parte(s) reunidas en el área de análisis. Las partes originales siguen guardadas.`,"success")});
+const MAX_INPUT=115000;
+$("clearPartsBtn").addEventListener("click",()=>{if(confirm("¿Borrar todas las partes temporales guardadas en este navegador?")){localStorage.removeItem(KEYS.parts);renderParts();msg("partsMessage","Partes temporales borradas.","success")}});
+$("pdfInput").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;if(file.type!=="application/pdf"){msg("pdfMessage","Selecciona un archivo PDF.","error");return}if(!window.pdfjsLib){msg("pdfMessage","No se cargó el lector PDF. Comprueba la conexión e inténtalo de nuevo.","error");return}msg("pdfMessage","Leyendo el texto seleccionable del PDF...");try{pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let text="";for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n);const content=await page.getTextContent();text+=`\n\n--- Página ${n} ---\n`+content.items.map(x=>x.str||"").join(" ")}if(!text.trim())throw Error("No se encontró texto seleccionable. Este PDF podría ser una imagen escaneada.");$("analysisText").value=text.slice(0,MAX_INPUT);state.pdfText=$("analysisText").value;msg("pdfMessage",`Texto extraído de ${pdf.numPages} página(s). Comprueba el contenido antes de analizarlo.`,"success")}catch(x){msg("pdfMessage",x.message||"No se pudo leer el PDF.","error")}finally{e.target.value=""}});
+$("clearPdfBtn").addEventListener("click",()=>{state.pdfText="";$("pdfInput").value="";msg("pdfMessage","El texto del PDF no se guarda como archivo en el servidor. Puedes quitarlo del área de análisis con el botón correspondiente.")});
+$("removeAnalysisTextBtn").addEventListener("click",()=>{$("analysisText").value="";state.pdfText="";msg("analysisMessage","El texto del área de análisis se ha borrado.")});
+$("projectPlanBtn").addEventListener("click",()=>{$("analysisTask").value="project";$("analysisText").value=`Organiza este material en tareas priorizadas. No inventes fechas ni responsables.\n${businessText()}\n\nMaterial del proyecto:\n${read(KEYS.parts,[]).map(p=>p.title+"\n"+p.content).join("\n\n")}`;$("analysisPanel").scrollIntoView({behavior:"smooth"})});
+$("exportDataBtn").addEventListener("click",()=>{const data={exportedAt:new Date().toISOString(),profile:read(KEYS.profile,null),crm:read(KEYS.crm,[]),projects:read(KEYS.projects,[]),parts:read(KEYS.parts,[]),history:read(KEYS.history,[])};const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="impacto-fund-privado-backup.json";a.click();URL.revokeObjectURL(url);msg("deleteMessage","Copia de seguridad preparada en tu dispositivo.")});
+$("deleteDataBtn").addEventListener("click",()=>{const mode=$("deleteMode").value;const labels={work:"partes temporales, análisis guardados, registros CRM y proyectos",all:"todos los datos locales de esta aplicación, incluido el perfil"};if(!confirm(`¿Confirmas borrar ${labels[mode]} de este navegador? Esta acción no se puede deshacer. Descarga una copia si necesitas conservarlos.`))return;const keys=mode==="all"?Object.values(KEYS):[KEYS.crm,KEYS.projects,KEYS.parts,KEYS.history,KEYS.notes];keys.forEach(k=>localStorage.removeItem(k));if(mode==="all"){state.profile=null;state.opportunities=[];editProfile();$("results").innerHTML="";$("naicsResults").innerHTML="";$("searchSummary").classList.add("hidden");$("analysisText").value="";$("questionText").value="";$("questionAnswer").textContent="";$("questionResult").classList.add("hidden")}renderCRM();renderProjects();renderParts();renderHistory();msg("deleteMessage",mode==="all"?"Se borraron los datos locales de la aplicación en este navegador.":"Se borraron los datos de trabajo seleccionados.","success")});
+$("language").addEventListener("change",()=>{document.documentElement.lang=lang()});
+session();
