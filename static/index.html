@@ -1,280 +1,87 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#17463a">
-<meta name="description" content="Investiga subvenciones, contratos y oportunidades para tu negocio. Organiza tus tareas y prepara borradores paso a paso.">
-<title>Impacto Fund Privado | May Roga LLC</title>
+<meta name="theme-color" content="#173b35">
+<meta name="description" content="Investiga subvenciones, contratos, códigos NAICS y oportunidades para tu negocio.">
+<title>Impacto Fund Privado</title>
 <link rel="stylesheet" href="/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
 <script src="/app.js" defer></script>
 </head>
 <body>
 <header class="topbar">
-<div>
-<p class="eyebrow">MAY ROGA LLC</p>
-<h1>Impacto Fund Privado</h1>
-<p class="subtitle">Encuentra oportunidades, organiza tu trabajo y prepara tus próximos pasos.</p>
-</div>
-<div class="top-actions">
-<label for="language">Idioma / Language</label>
-<select id="language" aria-label="Seleccionar idioma">
-<option value="es">Español</option>
-<option value="en">English</option>
-<option value="pt">Português</option>
-</select>
-<button id="logoutBtn" class="button button-light hidden" type="button">Salir</button>
-</div>
+  <div><p class="eyebrow">MAY ROGA LLC</p><h1>Impacto Fund Privado</h1><p class="subtitle">Organiza tu negocio, encuentra oportunidades y prepara tus próximos pasos.</p></div>
+  <div class="top-actions"><label for="language">Idioma / Language</label><select id="language"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select><button id="logoutBtn" class="button button-light hidden" type="button">Salir</button></div>
 </header>
 <main class="container">
 <section id="loginPanel" class="panel login-panel">
-<h2>Bienvenido</h2>
-<p>Entra para organizar la información de tu negocio.</p>
-<form id="loginForm">
-<label for="username">Usuario</label>
-<input id="username" name="username" autocomplete="username" required maxlength="150">
-<label for="password">Contraseña</label>
-<input id="password" name="password" type="password" autocomplete="current-password" required maxlength="300">
-<button class="button button-primary full" type="submit">Entrar</button>
-</form>
-<p id="loginMessage" class="message" role="status" aria-live="polite"></p>
+<h2>Acceso privado</h2><p>Inicia sesión para trabajar con la información de tu negocio.</p>
+<form id="loginForm"><label for="username">Usuario</label><input id="username" autocomplete="username" required maxlength="150"><label for="password">Contraseña</label><input id="password" type="password" autocomplete="current-password" required maxlength="300"><button class="button button-primary full" type="submit">Entrar</button></form><p id="loginMessage" class="message" role="status"></p>
 </section>
 <div id="appPanel" class="hidden">
-<section class="panel notice-panel">
-<strong>Comienza por lo más importante.</strong>
-<p>Primero describe tu negocio. Después podrás buscar oportunidades, revisar requisitos y organizar tus tareas. No necesitas ser experto para empezar.</p>
-</section>
+<section class="panel notice-panel"><strong>Un solo perfil para organizar tu trabajo.</strong><p>La aplicación usa la información de tu negocio para ayudarte a investigar, analizar requisitos, preparar borradores y priorizar tareas. Comprueba los datos importantes en las fuentes oficiales.</p></section>
 <section class="panel" id="profilePanel">
-<h2>1. Mi negocio o proyecto</h2>
-<p>Cuéntanos qué haces y qué quieres conseguir. Esta información ayuda a preparar búsquedas más relevantes.</p>
+<h2>Mi negocio o proyecto</h2><p>Completa estos datos una sola vez. Puedes editarlos cuando cambien.</p>
 <form id="profileForm">
 <input id="companyId" type="hidden">
-<label for="companyName">Nombre del negocio o proyecto *</label>
-<input id="companyName" name="companyName" required maxlength="160" placeholder="Escribe el nombre">
-<div class="form-grid">
-<div>
-<label for="companyLocation">Ciudad y estado</label>
-<input id="companyLocation" name="companyLocation" maxlength="120" placeholder="Ej. Miami, Florida">
-</div>
-<div>
-<label for="companyType">¿Qué tipo de organización eres?</label>
-<select id="companyType" name="companyType">
-<option value="small_business">Pequeña empresa</option>
-<option value="startup">Empresa nueva</option>
-<option value="nonprofit">Organización sin fines de lucro</option>
-<option value="individual">Persona / empleo</option>
-<option value="other">Otro tipo</option>
-</select>
-</div>
-</div>
-<label for="companyDescription">¿Qué hace tu negocio? *</label>
-<textarea id="companyDescription" name="companyDescription" rows="3" maxlength="6000" required placeholder="Describe tus productos o servicios, a quién ayudas y qué experiencia tienes."></textarea>
-<label for="companyGoals">¿Qué te gustaría conseguir? <span class="optional">Opcional</span></label>
-<textarea id="companyGoals" name="companyGoals" rows="2" maxlength="1500" placeholder="Ej. Encontrar subvenciones, contratos o recursos para crecer."></textarea>
-<div class="button-row">
-<button id="searchOpportunitiesBtn" class="button button-primary" type="submit">Guardar y buscar oportunidades</button>
-<button id="editProfileBtn" class="button button-light hidden" type="button">Editar mi perfil</button>
-</div>
-<p id="companyMessage" class="message" role="status" aria-live="polite"></p>
-</form>
-<div id="savedProfileSummary" class="saved-profile hidden" aria-live="polite"></div>
+<label for="companyName">Nombre del negocio o proyecto *</label><input id="companyName" required maxlength="160" placeholder="Nombre de tu empresa">
+<div class="form-grid"><div><label for="companyLocation">Ubicación</label><input id="companyLocation" maxlength="120" placeholder="Ej. Miami, Florida"></div><div><label for="companyType">Tipo de organización</label><select id="companyType"><option value="small_business">Pequeña empresa</option><option value="startup">Empresa nueva</option><option value="nonprofit">Organización sin fines de lucro</option><option value="individual">Persona / empleo</option><option value="other">Otro tipo</option></select></div></div>
+<label for="companyDescription">¿Qué hace tu negocio? *</label><textarea id="companyDescription" rows="3" maxlength="6000" required placeholder="Servicios, productos, experiencia y a quién atiendes."></textarea>
+<label for="companyGoals">¿Qué quieres conseguir? <span class="optional">Opcional</span></label><textarea id="companyGoals" rows="2" maxlength="1500" placeholder="Subvenciones, contratos, clientes, empleo u otro objetivo."></textarea>
+<div class="button-row"><button id="searchOpportunitiesBtn" class="button button-primary" type="submit">Guardar perfil y buscar oportunidades</button><button id="editProfileBtn" class="button button-light hidden" type="button">Editar perfil</button></div><p id="companyMessage" class="message" role="status"></p>
+</form><div id="savedProfileSummary" class="saved-profile hidden" aria-live="polite"></div>
 </section>
 <section id="opportunitiesPanel" class="panel">
-<h2>2. Oportunidades para mi negocio</h2>
-<p>Revisa las oportunidades encontradas y abre su fuente oficial para confirmar si puedes solicitarla.</p>
-<div id="searchProgress" class="progress-panel hidden" role="status" aria-live="polite">
-<span class="spinner" aria-hidden="true"></span>
-<div><strong>Buscando oportunidades...</strong><p>Estamos consultando las fuentes disponibles. Espera un momento.</p></div>
-</div>
-<p id="searchMessage" class="message" role="status" aria-live="polite"></p>
-<div id="searchSummary" class="search-summary hidden"></div>
+<h2>Oportunidades para mi negocio</h2><p>Resultados de las fuentes consultadas. La coincidencia no significa que cumplas todos los requisitos.</p>
+<div id="searchProgress" class="progress-panel hidden" role="status"><span class="spinner"></span><div><strong>Buscando oportunidades...</strong><p>Estamos consultando las fuentes disponibles.</p></div></div>
+<p id="searchMessage" class="message" role="status"></p><div id="searchSummary" class="search-summary hidden"></div>
 <div id="naicsResults" class="naics-box"></div>
-<div class="tabs" role="tablist" aria-label="Filtrar oportunidades">
-<button class="tab active" type="button" data-filter="all" role="tab" aria-selected="true">Todas</button>
-<button class="tab" type="button" data-filter="grant" role="tab" aria-selected="false">Subvenciones</button>
-<button class="tab" type="button" data-filter="contract" role="tab" aria-selected="false">Contratos</button>
-<button class="tab" type="button" data-filter="work" role="tab" aria-selected="false">Empleo y recursos</button>
-</div>
-<div id="results" class="results" aria-live="polite">
-<div class="empty-state">
-<h3>Empieza con tu perfil</h3>
-<p>Guarda la información de tu negocio para iniciar la búsqueda.</p>
-</div>
-</div>
-<div id="sourceStatus" class="source-status" aria-live="polite"></div>
-</section>
-<section id="savedSearchesPanel" class="panel">
-<h2>Mis búsquedas guardadas</h2>
-<p>Consulta aquí las búsquedas que esta versión de la aplicación haya guardado en tu navegador.</p>
-<div id="savedSearches" class="record-list"></div>
+<div class="tabs" role="tablist" aria-label="Filtrar oportunidades"><button class="tab active" type="button" data-filter="all" role="tab" aria-selected="true">Todas</button><button class="tab" type="button" data-filter="grant" role="tab" aria-selected="false">Subvenciones</button><button class="tab" type="button" data-filter="contract" role="tab" aria-selected="false">Contratos</button><button class="tab" type="button" data-filter="work" role="tab" aria-selected="false">Empleo y recursos</button></div>
+<div id="results" class="results"><div class="empty-state"><h3>Empieza con tu perfil</h3><p>Guarda el perfil para consultar oportunidades relevantes.</p></div></div><div id="sourceStatus" class="source-status"></div>
 </section>
 <section class="panel" id="analysisPanel">
-<h2>3. Entender requisitos y preparar documentos</h2>
-<p>Puedes pedir una explicación sencilla, comparar requisitos o preparar un borrador. Revisa siempre la información antes de usarla.</p>
-<div class="quick-actions">
-<button id="makePitchBtn" class="button button-secondary" type="button">Preparar presentación breve</button>
-<button id="makeProposalBtn" class="button button-secondary" type="button">Preparar propuesta</button>
-<button id="makeChecklistBtn" class="button button-secondary" type="button">Crear lista de documentos</button>
-<button id="projectPlanBtn" class="button button-secondary" type="button">Organizar un proyecto</button>
-</div>
-<label for="analysisTask">¿Qué quieres hacer?</label>
-<select id="analysisTask">
-<option value="analyze">Explicar la información en palabras sencillas</option>
-<option value="eligibility">Comparar los requisitos con mi negocio</option>
-<option value="checklist">Preparar una lista de documentos y pasos</option>
-<option value="proposal">Preparar un borrador de propuesta</option>
-<option value="pitch">Preparar una presentación breve del negocio</option>
-<option value="codes">Revisar posibles códigos NAICS</option>
-<option value="project">Organizar las tareas de un proyecto</option>
-</select>
-<label for="analysisText">Texto que quieres revisar</label>
-<textarea id="analysisText" rows="7" maxlength="115000" placeholder="Pega aquí los requisitos, las instrucciones o el texto que necesitas entender. También puedes leer un PDF más abajo."></textarea>
-<div class="button-row">
-<button id="removeAnalysisTextBtn" class="button button-light" type="button">Borrar texto</button>
-</div>
-<div class="privacy-check">
-<input id="aiConsent" type="checkbox">
-<label for="aiConsent">Acepto enviar este texto y el perfil de mi negocio al proveedor de inteligencia artificial configurado para realizar el análisis. He quitado los datos confidenciales que no sean necesarios.</label>
-</div>
-<button id="analyzeBtn" class="button button-primary" type="button">Explicar y analizar</button>
-<p id="analysisMessage" class="message" role="status" aria-live="polite"></p>
-<article id="analysisResult" class="analysis-result hidden" aria-live="polite">
-<div class="result-heading">
-<h3>Resultado del análisis</h3>
-<button id="copyAnalysisBtn" class="button button-secondary" type="button">Copiar resultado</button>
-</div>
-<p id="analysisProvider" class="small-note"></p>
-<pre id="analysisOutput"></pre>
-</article>
+<h2>Propuestas, pitch y análisis</h2><p>Analiza una convocatoria, compara requisitos o prepara un primer borrador. La IA no debe inventar información que no le hayas proporcionado.</p>
+<div class="quick-actions"><button id="makePitchBtn" class="button button-secondary" type="button">Crear pitch</button><button id="makeProposalBtn" class="button button-secondary" type="button">Crear propuesta</button><button id="makeChecklistBtn" class="button button-secondary" type="button">Lista de documentos</button><button id="projectPlanBtn" class="button button-secondary" type="button">Planificar proyecto</button></div>
+<label for="analysisTask">¿Qué necesitas?</label><select id="analysisTask"><option value="analyze">Explicar la información</option><option value="eligibility">Comparar requisitos con mi negocio</option><option value="checklist">Preparar lista de documentos y pasos</option><option value="proposal">Preparar borrador de propuesta</option><option value="pitch">Preparar pitch empresarial</option><option value="codes">Analizar códigos NAICS candidatos</option><option value="project">Organizar un proyecto</option></select>
+<label for="analysisText">Texto de la convocatoria, requisitos o instrucciones</label><textarea id="analysisText" rows="6" maxlength="115000" placeholder="Pega el texto aquí o extrae el contenido de un PDF."></textarea>
+<div class="button-row"><button id="removeAnalysisTextBtn" class="button button-light" type="button">Borrar texto del análisis</button></div>
+<div class="privacy-check"><input id="aiConsent" type="checkbox"><label for="aiConsent">Autorizo enviar este texto y el perfil de mi negocio al proveedor de IA configurado para el análisis. He retirado datos confidenciales innecesarios.</label></div>
+<button id="analyzeBtn" class="button button-primary" type="button">Analizar información</button><p id="analysisMessage" class="message" role="status"></p>
+<article id="analysisResult" class="analysis-result hidden"><div class="result-heading"><h3>Resultado</h3><button id="copyAnalysisBtn" class="button button-secondary" type="button">Copiar resultado</button></div><p id="analysisProvider" class="small-note"></p><pre id="analysisOutput"></pre></article>
 </section>
 <section class="panel" id="questionPanel">
-<h2>4. Hacer una pregunta</h2>
-<p>Escribe tu duda y solicita una explicación fácil de entender.</p>
-<label for="questionText">¿Qué necesitas aclarar?</label>
-<textarea id="questionText" rows="3" maxlength="10000" placeholder="Ej. ¿Qué debo revisar antes de solicitar esta subvención?"></textarea>
-<div class="privacy-check">
-<input id="questionConsent" type="checkbox">
-<label for="questionConsent">Acepto enviar mi pregunta y el perfil de mi negocio al proveedor de inteligencia artificial configurado para responder.</label>
-</div>
-<button id="askBtn" class="button button-primary" type="button">Responder mi pregunta</button>
-<p id="questionMessage" class="message" role="status" aria-live="polite"></p>
-<article id="questionResult" class="analysis-result hidden" aria-live="polite">
-<h3>Respuesta</h3>
-<pre id="questionAnswer"></pre>
-</article>
+<h2>Preguntas y respuestas</h2><p>Pregunta sobre tu negocio, subvenciones, contratos, requisitos, documentos o licitaciones.</p>
+<label for="questionText">¿Qué necesitas aclarar?</label><textarea id="questionText" rows="3" maxlength="10000" placeholder="Ej. ¿Qué requisitos debo confirmar antes de presentar una propuesta?"></textarea>
+<div class="privacy-check"><input id="questionConsent" type="checkbox"><label for="questionConsent">Autorizo enviar la pregunta y el perfil al proveedor de IA configurado.</label></div>
+<button id="askBtn" class="button button-primary" type="button">Responder pregunta</button><p id="questionMessage" class="message" role="status"></p>
+<article id="questionResult" class="analysis-result hidden"><h3>Respuesta</h3><pre id="questionAnswer"></pre></article>
 </section>
 <section class="panel" id="crmPanel">
-<h2>5. Mis contactos y oportunidades</h2>
-<p>Guarda lo que te interesa y el siguiente paso que necesitas dar. Estos registros se guardan en este navegador.</p>
-<form id="crmForm">
-<label for="crmTitle">Nombre del contacto u oportunidad *</label>
-<input id="crmTitle" name="crmTitle" required maxlength="200" placeholder="Ej. Nombre de una convocatoria o entidad">
-<div class="form-grid">
-<div>
-<label for="crmAgency">Entidad o contacto</label>
-<input id="crmAgency" name="crmAgency" maxlength="200" placeholder="Nombre de la entidad">
-</div>
-<div>
-<label for="crmStatus">¿En qué estado está?</label>
-<select id="crmStatus" name="crmStatus">
-<option>Pendiente</option>
-<option>En curso</option>
-<option>Enviado</option>
-<option>Ganado</option>
-<option>Descartado</option>
-</select>
-</div>
-</div>
-<label for="crmUrl">Enlace oficial</label>
-<input id="crmUrl" name="crmUrl" type="url" maxlength="1000" placeholder="https://...">
-<label for="crmNotes">Notas o próximo paso</label>
-<textarea id="crmNotes" name="crmNotes" rows="2" maxlength="3000" placeholder="Ej. Confirmar la fecha límite."></textarea>
-<button class="button button-primary" type="submit">Guardar contacto u oportunidad</button>
-</form>
-<p id="crmMessage" class="message" role="status" aria-live="polite"></p>
-<div id="crmList" class="record-list"></div>
+<h2>Mi CRM y seguimiento</h2><p>Guarda oportunidades, contactos y acciones. Estos registros se guardan en este navegador.</p>
+<form id="crmForm"><label for="crmTitle">Nombre del contacto u oportunidad *</label><input id="crmTitle" required maxlength="200" placeholder="Empresa, convocatoria o persona"><div class="form-grid"><div><label for="crmAgency">Entidad o contacto</label><input id="crmAgency" maxlength="200"></div><div><label for="crmStatus">Estado</label><select id="crmStatus"><option>Pendiente</option><option>En curso</option><option>Enviado</option><option>Ganado</option><option>Descartado</option></select></div></div><label for="crmUrl">Enlace oficial</label><input id="crmUrl" type="url" maxlength="1000" placeholder="https://..."><label for="crmNotes">Notas y siguiente paso</label><textarea id="crmNotes" rows="2" maxlength="3000"></textarea><button class="button button-primary" type="submit">Guardar registro</button></form><p id="crmMessage" class="message" role="status"></p><div id="crmList" class="record-list"></div>
 </section>
 <section class="panel" id="projectsPanel">
-<h2>6. Mis tareas y fechas</h2>
-<p>Registra lo que tienes que hacer y cuándo necesitas terminarlo.</p>
-<form id="projectForm">
-<label for="projectTitle">Nombre de la tarea o proyecto *</label>
-<input id="projectTitle" name="projectTitle" required maxlength="200" placeholder="Ej. Preparar los documentos">
-<label for="projectDescription">¿Qué hay que hacer?</label>
-<textarea id="projectDescription" name="projectDescription" rows="2" maxlength="3000" placeholder="Describe los pasos que quieres recordar."></textarea>
-<div class="form-grid">
-<div>
-<label for="projectDeadline">Fecha límite</label>
-<input id="projectDeadline" name="projectDeadline" type="date">
-</div>
-<div>
-<label for="projectPriority">¿Qué tan importante es?</label>
-<select id="projectPriority" name="projectPriority">
-<option>Alta</option>
-<option selected>Media</option>
-<option>Baja</option>
-</select>
-</div>
-</div>
-<button class="button button-primary" type="submit">Guardar tarea o proyecto</button>
-</form>
-<p id="projectMessage" class="message" role="status" aria-live="polite"></p>
-<div id="projectList" class="record-list"></div>
+<h2>Proyectos y fechas límite</h2><p>Registra tareas, fechas reales y prioridades para no perder de vista los plazos.</p>
+<form id="projectForm"><label for="projectTitle">Nombre del proyecto *</label><input id="projectTitle" required maxlength="200"><label for="projectDescription">Tareas o descripción</label><textarea id="projectDescription" rows="2" maxlength="3000"></textarea><div class="form-grid"><div><label for="projectDeadline">Fecha límite</label><input id="projectDeadline" type="date"></div><div><label for="projectPriority">Prioridad</label><select id="projectPriority"><option>Alta</option><option selected>Media</option><option>Baja</option></select></div></div><button class="button button-primary" type="submit">Guardar proyecto</button></form><p id="projectMessage" class="message" role="status"></p><div id="projectList" class="record-list"></div>
 </section>
 <section class="panel" id="documentsPanel">
-<h2>7. Leer y organizar documentos</h2>
-<p>Si tienes un PDF con texto seleccionable, puedes extraerlo para revisarlo. También puedes guardar varias partes de un documento largo.</p>
-<label for="pdfInput">Seleccionar un archivo PDF</label>
-<input id="pdfInput" type="file" accept="application/pdf">
-<p id="pdfMessage" class="message" role="status" aria-live="polite"></p>
-<button id="clearPdfBtn" class="button button-light" type="button">Limpiar selección de PDF</button>
-<div class="divider"></div>
-<h3>Guardar una parte del documento</h3>
-<p>Puedes guardar hasta 10 partes en el navegador y después reunirlas en el área de análisis.</p>
-<label for="partTitle">Nombre de esta parte</label>
-<input id="partTitle" maxlength="120" placeholder="Ej. Requisitos o presupuesto">
-<label for="partText">Texto de esta parte</label>
-<textarea id="partText" rows="4" maxlength="115000" placeholder="Pega aquí el contenido."></textarea>
-<div class="button-row">
-<button id="addPartBtn" class="button button-primary" type="button">Añadir parte</button>
-<button id="updatePartBtn" class="button button-secondary hidden" type="button">Guardar cambios de parte</button>
-<button id="combinePartsBtn" class="button button-secondary" type="button">Reunir partes para analizar</button>
-<button id="clearPartsBtn" class="button button-danger" type="button">Borrar todas las partes</button>
-</div>
-<p id="partsCount" class="small-note"></p>
-<p id="partsMessage" class="message" role="status" aria-live="polite"></p>
-<div id="partsList" class="record-list"></div>
+<h2>Documentos y textos largos</h2><p>Puedes añadir hasta 10 partes, editarlas o borrarlas y reunirlas para analizarlas. Las partes se conservan temporalmente en el almacenamiento local del navegador hasta que las borres.</p>
+<label for="pdfInput">Leer PDF con texto seleccionable</label><input id="pdfInput" type="file" accept="application/pdf"><p id="pdfMessage" class="message" role="status"></p><button id="clearPdfBtn" class="button button-light" type="button">Limpiar selección PDF</button>
+<div class="divider"></div><h3>Guardar una parte</h3><label for="partTitle">Nombre de la parte</label><input id="partTitle" maxlength="120" placeholder="Ej. Parte 1 — Requisitos"><label for="partText">Contenido de la parte</label><textarea id="partText" rows="4" maxlength="115000" placeholder="Pega aquí una parte del documento."></textarea>
+<div class="button-row"><button id="addPartBtn" class="button button-primary" type="button">Añadir parte</button><button id="updatePartBtn" class="button button-secondary hidden" type="button">Guardar cambios de parte</button><button id="combinePartsBtn" class="button button-secondary" type="button">Reunir partes en el análisis</button><button id="clearPartsBtn" class="button button-danger" type="button">Borrar todas las partes</button></div>
+<p id="partsCount" class="small-note"></p><p id="partsMessage" class="message" role="status"></p><div id="partsList" class="record-list"></div>
 </section>
-<section class="panel" id="historyPanel">
-<h2>8. Mis análisis anteriores</h2>
-<p>Consulta los análisis que la aplicación haya guardado localmente en este navegador.</p>
-<div id="historyList" class="record-list"></div>
-</section>
+<section class="panel" id="historyPanel"><h2>Historial de análisis</h2><p>Los últimos análisis quedan guardados localmente para que puedas consultarlos.</p><div id="historyList" class="record-list"></div></section>
 <section class="panel" id="dataPanel">
-<h2>9. Copias de seguridad y privacidad</h2>
-<p>El perfil, los contactos, los proyectos, las partes y el historial se guardan en el almacenamiento local de este navegador. No se garantiza que estén disponibles en otro dispositivo o navegador. El texto que envíes para analizar se transmite al proveedor de inteligencia artificial configurado.</p>
-<label for="deleteMode">¿Qué información quieres borrar?</label>
-<select id="deleteMode">
-<option value="work">Contactos, proyectos, partes e historial; conservar el perfil</option>
-<option value="all">Toda la información local de esta aplicación, incluido el perfil</option>
-</select>
-<div class="button-row">
-<button id="exportDataBtn" class="button button-secondary" type="button">Crear copia de seguridad</button>
-<button id="deleteDataBtn" class="button button-danger" type="button">Borrar información</button>
-</div>
-<p id="deleteMessage" class="message" role="status" aria-live="polite"></p>
+<h2>Privacidad y borrado de datos</h2><p>Los datos de perfil, CRM, proyectos, partes e historial se guardan en el almacenamiento local de este navegador. Borrar el historial del navegador, cambiar de dispositivo o usar otro navegador puede hacer que no estén disponibles. El texto que envíes a la IA se transmite al proveedor configurado para procesarlo.</p>
+<label for="deleteMode">¿Qué quieres borrar?</label><select id="deleteMode"><option value="work">Registros, proyectos, partes e historial (conservar perfil)</option><option value="all">Todo lo guardado localmente por esta aplicación, incluido el perfil</option></select>
+<div class="button-row"><button id="exportDataBtn" class="button button-secondary" type="button">Crear copia de seguridad</button><button id="deleteDataBtn" class="button button-danger" type="button">Borrar información</button></div><p id="deleteMessage" class="message" role="status"></p>
 </section>
-<section class="panel" id="officialSourcesPanel">
-<h2>Fuentes oficiales</h2>
-<p>Antes de tomar una decisión, confirma los requisitos, las fechas y las condiciones en la página oficial de la entidad.</p>
-<div id="portalLinks" class="link-list"></div>
-</section>
+<section class="panel"><h2>Fuentes oficiales</h2><p>Confirma siempre los requisitos, fechas, elegibilidad y condiciones directamente en los portales.</p><div id="portalLinks" class="link-list"></div></section>
 </div>
-<footer>
-<p>Herramienta de investigación y organización. No garantiza subvenciones, contratos ni empleo y no presenta solicitudes automáticamente. Los resultados generados por inteligencia artificial pueden contener errores. Comprueba la información importante en las fuentes oficiales.</p>
-</footer>
+<footer><p>Herramienta de investigación y organización. No garantiza subvenciones, contratos ni empleo. No presenta solicitudes automáticamente. Verifica los datos críticos con las entidades oficiales.</p></footer>
 </main>
 </body>
 </html>
